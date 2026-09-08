@@ -5,6 +5,10 @@ import streamlit as st
 from dotenv import load_dotenv
 from insightface.app import FaceAnalysis
 
+from langchain_core.embeddings import Embeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores.utils import DistanceStrategy
+
 
 # =========================================================
 # PAGE CONFIG — must be the first Streamlit call
@@ -27,12 +31,21 @@ load_dotenv()
 # =========================================================
 # SESSION STORAGE
 # =========================================================
-# This is temporary storage.
-# Data will be lost when the Streamlit app restarts.
+# st.session_state.vectorstore holds the actual FAISS index
+# (name + embedding + metadata) used for matching.
+# st.session_state.roster is a lightweight parallel list
+# (name/age/address only) used just to render the
+# "Registered People" list without reaching into FAISS
+# internals.
+# Both are still session-only — restarting the app clears
+# them, same as before.
 # =========================================================
 
-if "people" not in st.session_state:
-    st.session_state.people = []
+if "vectorstore" not in st.session_state:
+    st.session_state.vectorstore = None
+
+if "roster" not in st.session_state:
+    st.session_state.roster = []
 
 
 # =========================================================
@@ -56,6 +69,37 @@ def load_face_model():
 
 
 face_model = load_face_model()
+
+
+# =========================================================
+# LANGCHAIN EMBEDDINGS WRAPPER
+# =========================================================
+# LangChain's Embeddings interface (embed_documents/embed_query)
+# is built around embedding *text*. Our embeddings come from
+# images via ArcFace, so this class exists only to satisfy
+# FAISS's constructor, which requires an Embeddings instance.
+# Actual vectors always come from generate_embedding() below,
+# and we add/query the FAISS index at the vector level
+# (add_embeddings / similarity_search_with_score_by_vector),
+# so embed_documents/embed_query are never actually called.
+# =========================================================
+
+class ArcFaceEmbeddings(Embeddings):
+
+    def embed_documents(self, texts):
+        raise NotImplementedError(
+            "ArcFace embeddings come from generate_embedding() on "
+            "an image, not from text — use add_embeddings() instead."
+        )
+
+    def embed_query(self, text):
+        raise NotImplementedError(
+            "ArcFace embeddings come from generate_embedding() on "
+            "an image, not from text — use similarity_search_by_vector() instead."
+        )
+
+
+face_embeddings = ArcFaceEmbeddings()
 
 
 # =========================================================
@@ -130,39 +174,75 @@ def generate_embedding(image):
 
 
 # =========================================================
+# STORE A PERSON IN THE VECTORSTORE
+# =========================================================
+
+def add_person_to_store(name, age, address, vector):
+
+    metadata = {
+        "name": name,
+        "age": age,
+        "address": address,
+    }
+
+    # -----------------------------------------------------
+    # distance_strategy=MAX_INNER_PRODUCT is the key detail:
+    # FAISS defaults to Euclidean (L2) distance, which is NOT
+    # the same number as cosine similarity, even though the
+    # ranking it produces happens to agree for unit vectors.
+    # Since generate_embedding() already L2-normalizes the
+    # vector, inner product == cosine similarity, so this
+    # setting makes the FAISS score line up exactly with the
+    # 0.5 threshold you were already using.
+    # -----------------------------------------------------
+
+    if st.session_state.vectorstore is None:
+
+        st.session_state.vectorstore = FAISS.from_embeddings(
+            text_embeddings=[(name, vector.tolist())],
+            embedding=face_embeddings,
+            metadatas=[metadata],
+            distance_strategy=DistanceStrategy.MAX_INNER_PRODUCT,
+        )
+
+    else:
+
+        st.session_state.vectorstore.add_embeddings(
+            text_embeddings=[(name, vector.tolist())],
+            metadatas=[metadata],
+        )
+
+    st.session_state.roster.append(metadata)
+
+
+# =========================================================
 # FIND BEST MATCH
 # =========================================================
 
 def find_best_match(query_embedding):
 
     # No registered people
-    if len(st.session_state.people) == 0:
+    if st.session_state.vectorstore is None:
 
         return None, None
 
-    best_person = None
-    best_score = -1
-
     # -----------------------------------------------------
-    # Compare query against every registered person
+    # Vector-level query — bypasses ArcFaceEmbeddings.embed_query
+    # entirely, since we already have the vector.
     # -----------------------------------------------------
 
-    for person in st.session_state.people:
+    results = st.session_state.vectorstore.similarity_search_with_score_by_vector(
+        query_embedding.tolist(),
+        k=1,
+    )
 
-        stored_embedding = person["embedding"]
+    if not results:
 
-        score = float(np.dot(
-            query_embedding,
-            stored_embedding
-        ))
+        return None, None
 
-        # Keep highest similarity
-        if score > best_score:
+    doc, score = results[0]
 
-            best_score = score
-            best_person = person
-
-    return best_person, best_score
+    return doc.metadata, float(score)
 
 
 # =========================================================
@@ -285,31 +365,32 @@ with add_tab:
                     )
 
                 # -------------------------------------------------
-                # Create person record
+                # Check for duplicates
                 # -------------------------------------------------
+                
+                existing_person, existing_score = find_best_match(vector)
+                
+                # Using the same threshold (0.5) used for scanning
+                if existing_person is not None and existing_score >= 0.5:
+                    st.error(
+                        f"❌ Duplicate detected! This face matches "
+                        f"**{existing_person['name']}** (Score: {existing_score:.4f})."
+                    )
+                else:
+                    # -------------------------------------------------
+                    # Store person in the FAISS vectorstore
+                    # -------------------------------------------------
 
-                person = {
+                    add_person_to_store(
+                        name,
+                        age,
+                        address,
+                        vector,
+                    )
 
-                    "name": name,
-
-                    "age": age,
-
-                    "address": address,
-
-                    "embedding": vector
-                }
-
-                # -------------------------------------------------
-                # Store person
-                # -------------------------------------------------
-
-                st.session_state.people.append(
-                    person
-                )
-
-                st.success(
-                    f"✅ {name} added successfully!"
-                )
+                    st.success(
+                        f"✅ {name} added successfully!"
+                    )
 
             except Exception as e:
 
@@ -375,7 +456,7 @@ with scan_tab:
         # Check database
         # -------------------------------------------------
 
-        elif len(st.session_state.people) == 0:
+        elif st.session_state.vectorstore is None:
 
             st.warning(
                 "No people have been registered yet."
@@ -479,7 +560,7 @@ st.subheader(
     "👥 Registered People"
 )
 
-if len(st.session_state.people) == 0:
+if len(st.session_state.roster) == 0:
 
     st.info(
         "No people registered yet."
@@ -488,7 +569,7 @@ if len(st.session_state.people) == 0:
 else:
 
     for i, person in enumerate(
-        st.session_state.people
+        st.session_state.roster
     ):
 
         with st.expander(
@@ -507,11 +588,6 @@ else:
                 f"**Address:** {person['address']}"
             )
 
-            st.write(
-                f"**Embedding size:** "
-                f"{len(person['embedding'])}"
-            )
-
 
 # =========================================================
 # CLEAR DATABASE
@@ -523,7 +599,8 @@ if st.button(
     "🗑️ Clear All Registered People"
 ):
 
-    st.session_state.people = []
+    st.session_state.vectorstore = None
+    st.session_state.roster = []
 
     st.success(
         "All registered people have been removed."
