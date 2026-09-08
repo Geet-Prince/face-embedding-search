@@ -4,6 +4,8 @@
 # Web UI
 streamlit>=1.39.0
 
+# Prevent real opencv-python from being installed (fixes libGL error)
+./fake_opencv
 # Computer Vision (headless = no GUI/libGL deps needed)
 opencv-python-headless>=4.10.0.84
 

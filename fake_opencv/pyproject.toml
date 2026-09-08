@@ -1,0 +1,8 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "opencv-python"
+version = "999.9.9"
+description = "Dummy package to satisfy insightface dependency without installing GUI libs"
