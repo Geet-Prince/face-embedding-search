@@ -1,0 +1,19 @@
+# Face Recognition System - Requirements
+
+# Web UI
+streamlit
+
+# Computer Vision
+opencv-python
+
+# Numerical Operations
+numpy
+
+# Face Analysis (ArcFace embeddings)
+insightface
+onnxruntime
+
+# Environment Variables
+python-dotenv
+
+scikit-learn
