@@ -1,19 +1,20 @@
 # Face Recognition System - Requirements
 
 # Web UI
-streamlit
+streamlit==1.39.0
 
 # Computer Vision
-opencv-python-headless
+opencv-python-headless==4.10.0.84
 
 # Numerical Operations
-numpy
+numpy==1.26.4
 
 # Face Analysis (ArcFace embeddings)
-insightface
-onnxruntime
+insightface==0.7.3
+onnxruntime==1.19.2
 
 # Environment Variables
-python-dotenv
+python-dotenv==1.0.1
 
-scikit-learn
+# ML Utilities
+scikit-learn==1.5.2
