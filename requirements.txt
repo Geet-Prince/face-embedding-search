@@ -18,6 +18,3 @@ onnxruntime>=1.24.0
 
 # Environment Variables
 python-dotenv>=1.0.1
-
-# ML Utilities
-scikit-learn>=1.5.0

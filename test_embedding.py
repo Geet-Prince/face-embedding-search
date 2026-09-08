@@ -1,11 +1,20 @@
-import os
 import cv2
 import numpy as np
 import streamlit as st
 
 from dotenv import load_dotenv
 from insightface.app import FaceAnalysis
-from sklearn.metrics.pairwise import cosine_similarity
+
+
+# =========================================================
+# PAGE CONFIG — must be the first Streamlit call
+# =========================================================
+
+st.set_page_config(
+    page_title="Face Recognition System",
+    page_icon="👤",
+    layout="centered"
+)
 
 
 # =========================================================
@@ -13,8 +22,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 # =========================================================
 
 load_dotenv()
-
-HF_TOKEN = os.getenv("HF_TOKEN")
 
 
 # =========================================================
@@ -144,10 +151,10 @@ def find_best_match(query_embedding):
 
         stored_embedding = person["embedding"]
 
-        score = cosine_similarity(
-            query_embedding.reshape(1, -1),
-            stored_embedding.reshape(1, -1)
-        )[0][0]
+        score = float(np.dot(
+            query_embedding,
+            stored_embedding
+        ))
 
         # Keep highest similarity
         if score > best_score:
@@ -156,17 +163,6 @@ def find_best_match(query_embedding):
             best_person = person
 
     return best_person, best_score
-
-
-# =========================================================
-# STREAMLIT CONFIGURATION
-# =========================================================
-
-st.set_page_config(
-    page_title="Face Recognition System",
-    page_icon="👤",
-    layout="centered"
-)
 
 
 # =========================================================
@@ -283,9 +279,10 @@ with add_tab:
                 # Generate face embedding
                 # -------------------------------------------------
 
-                vector = generate_embedding(
-                    uploaded_image
-                )
+                with st.spinner("Generating face embedding..."):
+                    vector = generate_embedding(
+                        uploaded_image
+                    )
 
                 # -------------------------------------------------
                 # Create person record
@@ -311,24 +308,7 @@ with add_tab:
                 )
 
                 st.success(
-                    f"{name} added successfully!"
-                )
-
-                # -------------------------------------------------
-                # Show embedding information
-                # -------------------------------------------------
-
-                st.write(
-                    "Embedding dimensions:",
-                    len(vector)
-                )
-
-                st.write(
-                    "First 10 embedding values:"
-                )
-
-                st.code(
-                    str(vector[:10])
+                    f"✅ {name} added successfully!"
                 )
 
             except Exception as e:
@@ -409,9 +389,10 @@ with scan_tab:
                 # Generate embedding for scanned face
                 # -------------------------------------------------
 
-                query_vector = generate_embedding(
-                    scan_image
-                )
+                with st.spinner("Scanning face..."):
+                    query_vector = generate_embedding(
+                        scan_image
+                    )
 
                 # -------------------------------------------------
                 # Find closest person
