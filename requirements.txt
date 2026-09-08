@@ -20,3 +20,8 @@ onnxruntime>=1.24.0
 
 # Environment Variables
 python-dotenv>=1.0.1
+
+# Vector Store / LangChain
+langchain-core
+langchain-community
+faiss-cpu
