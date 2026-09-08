@@ -1,7 +1,11 @@
 # 👤 Face Embedding Search
 
+[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://geet-prince.streamlit.app/)
+
 An **embedding-based face recognition app** built with **Streamlit** and **InsightFace (ArcFace model)**.  
 Register people by uploading their photo, then identify them by scanning a new image — using **512-dimensional face embeddings** and **cosine similarity**.
+
+🔗 **Live App:** [geet-prince.streamlit.app](https://geet-prince.streamlit.app/)
 
 ---
 
