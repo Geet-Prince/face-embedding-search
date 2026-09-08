@@ -1,20 +1,23 @@
 # Face Recognition System - Requirements
+# Compatible with Python 3.14 (Streamlit Cloud default)
 
 # Web UI
-streamlit==1.39.0
+streamlit>=1.39.0
 
-# Computer Vision
-opencv-python-headless==4.10.0.84
+# Computer Vision (headless = no GUI/libGL deps needed)
+opencv-python-headless>=4.10.0.84
 
 # Numerical Operations
-numpy==1.26.4
+# numpy 2.x required for Python 3.13+ (1.x has no py3.14 wheels)
+numpy>=2.0.0
 
 # Face Analysis (ArcFace embeddings)
-insightface==0.7.3
-onnxruntime==1.19.2
+insightface>=0.7.3
+# onnxruntime 1.19.x has no py3.14 wheels; 1.24.x+ does
+onnxruntime>=1.24.0
 
 # Environment Variables
-python-dotenv==1.0.1
+python-dotenv>=1.0.1
 
 # ML Utilities
-scikit-learn==1.5.2
+scikit-learn>=1.5.0
